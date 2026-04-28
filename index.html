@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Thì Ra Ta Là Tuyệt Thế Võ Thần</title>
+    <title>Trình Đọc EPUB</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body data-theme="light">
@@ -61,6 +61,7 @@
         <div class="top-bar">
             <button class="menu-btn" onclick="toggleSidebar()">☰ Chương</button>
             <div class="nav-group">
+                <button class="icon-btn" onclick="document.getElementById('epubInput').click()" title="Mở sách khác">📂 Mở file</button>
                 <button class="icon-btn" onclick="addBookmark()" title="Lưu chương đang đọc">🔖 Đánh dấu</button>
                 <button class="icon-btn" onclick="toggleSettings()" title="Tùy chỉnh font chữ">⚙️</button>
                 <button class="theme-btn" onclick="toggleTheme()" title="Đổi màu nền">🌓</button>
@@ -68,13 +69,20 @@
         </div>
         
         <div id="content-area">
+            <div id="upload-screen">
+                <h2 style="color: var(--primary); margin-bottom: 20px;">📚 Mở Sách EPUB</h2>
+                <button class="upload-btn" onclick="document.getElementById('epubInput').click()">📁 Chọn File Từ Thiết Bị</button>
+                <input type="file" id="epubInput" accept=".epub" style="display:none;" onchange="handleFileUpload(event)">
+                <p style="color: gray; font-size: 14px; margin-top: 15px; text-align: center; max-width: 80%;">
+                    Tiến trình đọc sẽ được tự động lưu lại.<br>Mở lại trang web, hãy chọn file sách cũ để đọc tiếp.
+                </p>
+            </div>
             <div id="reader-container"></div>
         </div>
     </main>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.1.5/jszip.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/epubjs/dist/epub.min.js"></script>
-
     <script src="script.js"></script>
 </body>
 </html>
