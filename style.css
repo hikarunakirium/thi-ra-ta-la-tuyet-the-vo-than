@@ -29,20 +29,21 @@ body { margin: 0; font-family: system-ui, sans-serif; background: var(--bg); col
 #main-view { width: 100vw; height: 100vh; display: flex; flex-direction: column; }
 .top-bar { padding: 10px 20px; background: var(--card); border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; z-index: 10; }
 .nav-group { display: flex; gap: 10px; }
-
+/* CHỈNH LẠI CƠ CHẾ CUỘN DỌC KIỂU WEB NOVEL */
 #content-area { 
     flex: 1; 
     position: relative; 
-    overflow: hidden; 
+    overflow-y: auto; /* Mở khóa cuộn dọc cho thẻ cha */
+    overflow-x: hidden;
+    scroll-behavior: smooth;
 } 
-
 #reader-container { 
-    position: absolute; 
-    top: 0; bottom: 0; left: 0; right: 0; 
+    width: 100%; 
+    min-height: 100%; /* Bỏ absolute, dùng min-height để iframe tự giãn xuống theo chương */
     max-width: 900px; 
     margin: 0 auto; 
+    padding-bottom: 50px; /* Thêm khoảng trống ở cuối mỗi chương để dễ đọc */
 }
-
 /* THÊM MỚI: Màn hình chọn file ban đầu */
 #upload-screen { 
     position: absolute; inset: 0; background: var(--bg); z-index: 50;
