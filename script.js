@@ -40,14 +40,16 @@ function initReader(bookData) {
     book = ePub(bookData);
     rendition = book.renderTo("reader-container", {
         manager: "continuous",
-        flow: "scrolled",
+        flow: "scrolled-doc", // Bắt buộc dùng scrolled-doc để cuộn dọc liên tục
         width: "100%",
-        height: "100%",
-        snap: false // Cuộn mượt trên điện thoại
+        height: "auto", // Để chiều cao tự giãn theo nội dung chương
+        snap: false 
     });
 
     rendition.hooks.content.register(function(contents, view) {
+        // Fix lỗi khựng cuộn trên điện thoại
         contents.document.body.style.WebkitOverflowScrolling = 'touch';
+        contents.document.documentElement.style.overflowY = 'auto';
     });
 
     registerThemes();
