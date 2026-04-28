@@ -27,46 +27,32 @@ body { margin: 0; font-family: system-ui, sans-serif; background: var(--bg); col
 .setting-group select, .setting-group input { width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg); color: var(--text); outline: none; }
 
 #main-view { width: 100vw; height: 100vh; display: flex; flex-direction: column; }
-.top-bar { padding: 10px 20px; background: var(--card); border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
-.nav-group { display: flex; gap: 10px; }
-
-/* CSS chỉnh sửa cho epub.js */
-#content-area { flex: 1; padding: 0; overflow-y: hidden; } 
-#reader-container { width: 100%; height: 100%; max-width: 900px; margin: 0 auto; }
-
-#overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 999; }
-#overlay.show { display: block; }
-
-button { cursor: pointer; padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border); background: var(--card); color: var(--text); font-weight: 500; }
-button:hover { background: var(--bg); }
-.chapter-link { display: block; padding: 12px; cursor: pointer; border-radius: 8px; font-size: 15px; margin-bottom: 4px; border-bottom: 1px dashed var(--border); }
-.chapter-link:hover { background: var(--border); }
-.chapter-link.active { background: var(--primary); color: white; }
-
-@media (max-width: 768px) {
-    .top-bar { padding: 8px 10px; }
-    .nav-group .icon-btn { font-size: 0; padding: 8px; }
-    .nav-group .icon-btn::first-letter { font-size: 16px; } 
-}
-
-/* ... giữ nguyên phần CSS bên trên của bạn ... */
-
-#main-view { width: 100vw; height: 100vh; display: flex; flex-direction: column; }
 .top-bar { padding: 10px 20px; background: var(--card); border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; z-index: 10; }
 .nav-group { display: flex; gap: 10px; }
 
-/* FIX LỖI CUỘN CHO EPUB.JS */
 #content-area { 
     flex: 1; 
-    position: relative; /* Quan trọng */
-    overflow: hidden; /* Khóa cuộn thẻ cha, nhường iframe của epubjs tự cuộn */
+    position: relative; 
+    overflow: hidden; 
 } 
+
 #reader-container { 
-    position: absolute; /* Phải dùng absolute để epubjs đo đạc chính xác */
+    position: absolute; 
     top: 0; bottom: 0; left: 0; right: 0; 
     max-width: 900px; 
     margin: 0 auto; 
 }
+
+/* THÊM MỚI: Màn hình chọn file ban đầu */
+#upload-screen { 
+    position: absolute; inset: 0; background: var(--bg); z-index: 50;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+}
+.upload-btn { 
+    padding: 15px 30px; font-size: 18px; background: var(--primary); color: white; border: none; border-radius: 8px; cursor: pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.1); transition: 0.2s;
+}
+.upload-btn:hover { opacity: 0.9; transform: translateY(-2px); }
+
 
 #overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 999; }
 #overlay.show { display: block; }
@@ -75,7 +61,7 @@ button { cursor: pointer; padding: 8px 12px; border-radius: 6px; border: 1px sol
 button:hover { background: var(--bg); }
 .chapter-link { display: block; padding: 12px; cursor: pointer; border-radius: 8px; font-size: 15px; margin-bottom: 4px; border-bottom: 1px dashed var(--border); transition: 0.2s; }
 .chapter-link:hover { background: var(--border); }
-.chapter-link.active { background: var(--primary); color: white; font-weight: bold; border-left: 4px solid #ffc107; } /* Nổi bật chương đang đọc */
+.chapter-link.active { background: var(--primary); color: white; font-weight: bold; border-left: 4px solid #ffc107; }
 
 @media (max-width: 768px) {
     .top-bar { padding: 8px 10px; }
