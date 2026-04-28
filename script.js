@@ -1,6 +1,7 @@
 // --- Cấu Hình File EPUB ---
-const EPUB_FILE = "Thì Ra Ta Là Tuyệt Thế Võ Thần - Phong Lăng Bắc.epub";
-const STORAGE_PREFIX = "epub_vo_than_"; // Đổi prefix để không trùng dữ liệu
+// Dùng encodeURI để không bị lỗi do khoảng trắng và tiếng Việt có dấu
+const EPUB_FILE = encodeURI("Thì Ra Ta Là Tuyệt Thế Võ Thần - Phong Lăng Bắc.epub");
+const STORAGE_PREFIX = "epub_vo_than_"; 
 
 let book;
 let rendition;
@@ -9,21 +10,24 @@ let currentChapterName = "Đang đọc...";
 let savedBookmarks = JSON.parse(localStorage.getItem(STORAGE_PREFIX + 'bookmarks') || '[]');
 
 window.onload = () => {
-    // 1. Khởi tạo EPUB
     book = ePub(EPUB_FILE);
     rendition = book.renderTo("reader-container", {
         manager: "continuous",
         flow: "scrolled",
         width: "100%",
-        height: "100%"
+        height: "100%",
+        snap: false // Tắt snap để cuộn mượt hơn, dễ ăn event cuộn ngược
     });
 
-    // 2. Khởi tạo Theme & Settings
+    // Fix lỗi mất đà cuộn trên điện thoại iOS/Safari
+    rendition.hooks.content.register(function(contents, view) {
+        contents.document.body.style.WebkitOverflowScrolling = 'touch';
+    });
+
     registerThemes();
     loadSettings();
     renderBookmarks();
 
-    // 3. Phục hồi vị trí đọc cuối cùng
     const lastLocation = localStorage.getItem(STORAGE_PREFIX + 'lastRead');
     if (lastLocation) {
         rendition.display(lastLocation);
@@ -31,17 +35,26 @@ window.onload = () => {
         rendition.display();
     }
 
-    // 4. Lắng nghe sự kiện cuộn/chuyển trang để lưu tiến trình
+    // FIX NHẬN DIỆN CHƯƠNG KHI CUỘN
     rendition.on("relocated", (location) => {
         currentLocationCfi = location.start.cfi;
         localStorage.setItem(STORAGE_PREFIX + 'lastRead', currentLocationCfi);
         
-        // Lấy tên chương hiện tại để lưu bookmark
-        const navItem = book.navigation.get(location.start.href);
-        if(navItem) currentChapterName = navItem.label;
+        // Loại bỏ phần #hash phía sau (nếu có) để tìm chính xác tên chương
+        const cleanHref = location.start.href.split('#')[0];
+        let navItem = book.navigation.get(cleanHref) || book.navigation.get(location.start.href);
+        
+        if(navItem) {
+            currentChapterName = navItem.label;
+            
+            // Tự động Highlight chương đang đọc trong Sidebar
+            document.querySelectorAll('.chapter-link').forEach(el => el.classList.remove('active'));
+            const links = Array.from(document.querySelectorAll('.chapter-link'));
+            const activeLink = links.find(el => el.textContent.trim() === currentChapterName.trim());
+            if (activeLink) activeLink.classList.add('active');
+        }
     });
 
-    // 5. Render Sidebar Mục Lục tự động từ file EPUB
     book.loaded.navigation.then((nav) => {
         const list = document.getElementById('chapter-list');
         list.innerHTML = nav.map(chapter => 
@@ -50,13 +63,11 @@ window.onload = () => {
     });
 };
 
-// --- Điều hướng sách ---
 function goTo(hrefOrCfi) {
     rendition.display(hrefOrCfi);
     closeAllPanels();
 }
 
-// --- Cài đặt & Giao diện ---
 function registerThemes() {
     rendition.themes.register("dark", { 
         "body": { "background": "#121212", "color": "#d4d4d4" },
@@ -93,11 +104,9 @@ function applySettings(save = true) {
     const fLine = document.getElementById('lineHeight').value;
     const isDark = document.body.getAttribute('data-theme') === 'dark';
 
-    // UI Bên ngoài
     document.getElementById('fontSizeVal').innerText = fSize;
     document.getElementById('lineHeightVal').innerText = fLine;
 
-    // UI Bên trong Iframe EPUB
     rendition.themes.font(fFamily);
     rendition.themes.fontSize(fSize + "px");
     rendition.themes.override("line-height", fLine);
@@ -117,10 +126,8 @@ function toggleTheme() {
     applySettings(true);
 }
 
-// --- Bookmarks ---
 function addBookmark() {
     if (!currentLocationCfi) return;
-    
     const exists = savedBookmarks.find(b => b.cfi === currentLocationCfi);
     if (!exists) {
         savedBookmarks.push({ cfi: currentLocationCfi, name: currentChapterName });
@@ -153,7 +160,6 @@ function renderBookmarks() {
     `).join("");
 }
 
-// --- Backup & Restore ---
 function exportData() {
     const data = {
         lastRead: localStorage.getItem(STORAGE_PREFIX + 'lastRead'),
@@ -185,7 +191,6 @@ function importData(event) {
             if (data.font) localStorage.setItem(STORAGE_PREFIX + 'font', data.font);
             if (data.size) localStorage.setItem(STORAGE_PREFIX + 'size', data.size);
             if (data.line) localStorage.setItem(STORAGE_PREFIX + 'line', data.line);
-            
             alert("✅ Phục hồi dữ liệu thành công! Trang web sẽ tải lại.");
             location.reload();
         } catch (err) {
@@ -195,11 +200,15 @@ function importData(event) {
     reader.readAsText(file);
 }
 
-// --- Menu UI Điều khiển ---
 function toggleSidebar() { 
     document.getElementById('sidebar').classList.toggle('open');
     document.getElementById('settings-panel').classList.remove('open');
     checkOverlay();
+    // Cuộn tới chapter đang đọc trong sidebar
+    if (document.getElementById('sidebar').classList.contains('open')) {
+        const activeItem = document.querySelector('.chapter-link.active');
+        if(activeItem) activeItem.scrollIntoView({ block: 'center' });
+    }
 }
 function toggleSettings() { 
     document.getElementById('settings-panel').classList.toggle('open');
