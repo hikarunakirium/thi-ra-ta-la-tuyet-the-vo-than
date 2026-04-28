@@ -48,3 +48,37 @@ button:hover { background: var(--bg); }
     .nav-group .icon-btn { font-size: 0; padding: 8px; }
     .nav-group .icon-btn::first-letter { font-size: 16px; } 
 }
+
+/* ... giữ nguyên phần CSS bên trên của bạn ... */
+
+#main-view { width: 100vw; height: 100vh; display: flex; flex-direction: column; }
+.top-bar { padding: 10px 20px; background: var(--card); border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; z-index: 10; }
+.nav-group { display: flex; gap: 10px; }
+
+/* FIX LỖI CUỘN CHO EPUB.JS */
+#content-area { 
+    flex: 1; 
+    position: relative; /* Quan trọng */
+    overflow: hidden; /* Khóa cuộn thẻ cha, nhường iframe của epubjs tự cuộn */
+} 
+#reader-container { 
+    position: absolute; /* Phải dùng absolute để epubjs đo đạc chính xác */
+    top: 0; bottom: 0; left: 0; right: 0; 
+    max-width: 900px; 
+    margin: 0 auto; 
+}
+
+#overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 999; }
+#overlay.show { display: block; }
+
+button { cursor: pointer; padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border); background: var(--card); color: var(--text); font-weight: 500; }
+button:hover { background: var(--bg); }
+.chapter-link { display: block; padding: 12px; cursor: pointer; border-radius: 8px; font-size: 15px; margin-bottom: 4px; border-bottom: 1px dashed var(--border); transition: 0.2s; }
+.chapter-link:hover { background: var(--border); }
+.chapter-link.active { background: var(--primary); color: white; font-weight: bold; border-left: 4px solid #ffc107; } /* Nổi bật chương đang đọc */
+
+@media (max-width: 768px) {
+    .top-bar { padding: 8px 10px; }
+    .nav-group .icon-btn { font-size: 0; padding: 8px; }
+    .nav-group .icon-btn::first-letter { font-size: 16px; } 
+}
