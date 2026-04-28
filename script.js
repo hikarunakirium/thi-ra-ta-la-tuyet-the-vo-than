@@ -1,13 +1,15 @@
 let book;
 let rendition;
+let pdfDoc = null;
+let isPdfMode = false;
+
 let currentLocationCfi = "";
 let currentChapterName = "Đang đọc...";
-let GLOBAL_PREFIX = "epub_global_"; 
-let BOOK_PREFIX = "epub_book_"; // Sẽ được gán tự động theo tên file
+let GLOBAL_PREFIX = "reader_global_"; 
+let BOOK_PREFIX = "reader_book_"; 
 let savedBookmarks = [];
 
 window.onload = () => {
-    // Lúc đầu chỉ load giao diện chung
     loadSettings();
 };
 
@@ -15,39 +17,43 @@ function handleFileUpload(event) {
     const file = event.target.files[0];
     if (!file) return;
 
-    // Lọc ký tự đặc biệt của tên file để làm id riêng cho mỗi cuốn sách
-    BOOK_PREFIX = "epub_" + file.name.replace(/[^a-zA-Z0-9]/g, '') + "_";
+    // Phân loại định dạng
+    const ext = file.name.split('.').pop().toLowerCase();
+    isPdfMode = (ext === 'pdf');
+
+    BOOK_PREFIX = (isPdfMode ? "pdf_" : "epub_") + file.name.replace(/[^a-zA-Z0-9]/g, '') + "_";
     savedBookmarks = JSON.parse(localStorage.getItem(BOOK_PREFIX + 'bookmarks') || '[]');
 
-    // Ẩn màn hình upload
     document.getElementById('upload-screen').style.display = 'none';
+    
+    // Reset container
+    document.getElementById("reader-container").innerHTML = "";
+    if (book) { book.destroy(); book = null; }
+    pdfDoc = null;
 
-    // Xóa sách hiện tại (nếu có) khi muốn mở sách khác
-    if (book) {
-        book.destroy();
-        document.getElementById("reader-container").innerHTML = "";
-    }
-
-    // Đọc file EPUB dưới dạng ArrayBuffer để dùng cho ePub.js
     const reader = new FileReader();
     reader.onload = function(e) {
-        initReader(e.target.result);
+        if (isPdfMode) {
+            initPdfReader(new Uint8Array(e.target.result));
+        } else {
+            initEpubReader(e.target.result);
+        }
     };
     reader.readAsArrayBuffer(file);
 }
 
-function initReader(bookData) {
+// ======================== LOGIC EPUB ========================
+function initEpubReader(bookData) {
     book = ePub(bookData);
     rendition = book.renderTo("reader-container", {
         manager: "continuous",
-        flow: "scrolled-doc", // Bắt buộc dùng scrolled-doc để cuộn dọc liên tục
+        flow: "scrolled-doc", 
         width: "100%",
-        height: "auto", // Để chiều cao tự giãn theo nội dung chương
+        height: "auto", 
         snap: false 
     });
 
     rendition.hooks.content.register(function(contents, view) {
-        // Fix lỗi khựng cuộn trên điện thoại
         contents.document.body.style.WebkitOverflowScrolling = 'touch';
         contents.document.documentElement.style.overflowY = 'auto';
     });
@@ -57,11 +63,8 @@ function initReader(bookData) {
     renderBookmarks();
 
     const lastLocation = localStorage.getItem(BOOK_PREFIX + 'lastRead');
-    if (lastLocation) {
-        rendition.display(lastLocation);
-    } else {
-        rendition.display();
-    }
+    if (lastLocation) rendition.display(lastLocation);
+    else rendition.display();
 
     rendition.on("relocated", (location) => {
         currentLocationCfi = location.start.cfi;
@@ -69,14 +72,9 @@ function initReader(bookData) {
         
         const cleanHref = location.start.href.split('#')[0];
         let navItem = book.navigation.get(cleanHref) || book.navigation.get(location.start.href);
-        
         if(navItem) {
             currentChapterName = navItem.label;
-            
-            document.querySelectorAll('.chapter-link').forEach(el => el.classList.remove('active'));
-            const links = Array.from(document.querySelectorAll('.chapter-link'));
-            const activeLink = links.find(el => el.textContent.trim() === currentChapterName.trim());
-            if (activeLink) activeLink.classList.add('active');
+            highlightSidebarItem(currentChapterName);
         }
     });
 
@@ -88,8 +86,105 @@ function initReader(bookData) {
     });
 }
 
-function goTo(hrefOrCfi) {
-    if(rendition) rendition.display(hrefOrCfi);
+// ======================== LOGIC PDF ========================
+async function initPdfReader(pdfData) {
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    
+    try {
+        pdfDoc = await pdfjsLib.getDocument({data: pdfData}).promise;
+        const container = document.getElementById("reader-container");
+        
+        // Tạo Mục lục nhảy trang
+        const list = document.getElementById('chapter-list');
+        let tocHtml = "";
+        for(let i = 1; i <= pdfDoc.numPages; i+=10) {
+            tocHtml += `<a class="chapter-link" onclick="goTo('${i}')">Trang ${i}</a>`;
+        }
+        list.innerHTML = tocHtml;
+
+        // Tạo khung placeholder cho IntersectionObserver (Lazy Load)
+        for(let i = 1; i <= pdfDoc.numPages; i++) {
+            let pageDiv = document.createElement("div");
+            pageDiv.id = `pdf-page-${i}`;
+            pageDiv.className = "pdf-page-container";
+            pageDiv.dataset.page = i;
+            container.appendChild(pageDiv);
+        }
+
+        renderBookmarks();
+
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if(entry.isIntersecting) {
+                    const pageNum = parseInt(entry.target.dataset.page);
+                    renderPdfPage(pageNum, entry.target);
+                    
+                    currentLocationCfi = pageNum.toString();
+                    currentChapterName = `Trang ${pageNum}`;
+                    localStorage.setItem(BOOK_PREFIX + 'lastRead', currentLocationCfi);
+                    
+                    // Highlight mốc trang trong sidebar
+                    const targetPageText = `Trang ${Math.floor((pageNum-1)/10)*10 + 1}`;
+                    highlightSidebarItem(targetPageText);
+                }
+            });
+        }, { rootMargin: "1000px 0px" });
+
+        document.querySelectorAll('.pdf-page-container').forEach(el => observer.observe(el));
+
+        // Cuộn tới trang đọc lần cuối
+        const lastRead = localStorage.getItem(BOOK_PREFIX + 'lastRead');
+        if (lastRead) {
+            setTimeout(() => goTo(lastRead), 300);
+        }
+
+    } catch (err) {
+        alert("Lỗi khi đọc file PDF!");
+        console.error(err);
+    }
+}
+
+async function renderPdfPage(pageNum, container) {
+    if(container.hasChildNodes()) return; // Đã render rồi
+    
+    const page = await pdfDoc.getPage(pageNum);
+    // Tính toán scale vừa với màn hình điện thoại/máy tính
+    const screenWidth = document.getElementById("content-area").clientWidth - 20;
+    const initialViewport = page.getViewport({scale: 1});
+    const scale = Math.min(1.5, screenWidth / initialViewport.width);
+    const viewport = page.getViewport({scale: scale});
+    
+    const canvas = document.createElement("canvas");
+    const ctx = canvas.getContext("2d");
+    canvas.height = viewport.height;
+    canvas.width = viewport.width;
+    canvas.className = "pdf-canvas";
+    
+    container.appendChild(canvas);
+    await page.render({canvasContext: ctx, viewport: viewport}).promise;
+}
+
+
+// ======================== HÀM CHUNG ========================
+function highlightSidebarItem(textMatch) {
+    document.querySelectorAll('.chapter-link').forEach(el => el.classList.remove('active'));
+    const links = Array.from(document.querySelectorAll('.chapter-link'));
+    const activeLink = links.find(el => el.textContent.trim() === textMatch.trim());
+    if (activeLink) activeLink.classList.add('active');
+}
+
+function goTo(target) {
+    if (isPdfMode) {
+        const el = document.getElementById(`pdf-page-${target}`);
+        if(el) {
+            document.getElementById("content-area").scrollTo({
+                top: el.offsetTop,
+                behavior: 'smooth'
+            });
+        }
+    } else {
+        if(rendition) rendition.display(target);
+    }
     closeAllPanels();
 }
 
@@ -121,7 +216,7 @@ function loadSettings() {
     document.getElementById('fontSize').value = fSize;
     document.getElementById('lineHeight').value = fLine;
     
-    if(rendition) applySettings(false);
+    applySettings(false);
 }
 
 function applySettings(save = true) {
@@ -133,7 +228,8 @@ function applySettings(save = true) {
     document.getElementById('fontSizeVal').innerText = fSize;
     document.getElementById('lineHeightVal').innerText = fLine;
 
-    if(rendition) {
+    // Chỉ áp dụng css nội dung nếu là EPUB
+    if(!isPdfMode && rendition) {
         rendition.themes.font(fFamily);
         rendition.themes.fontSize(fSize + "px");
         rendition.themes.override("line-height", fLine);
@@ -161,7 +257,7 @@ function addBookmark() {
         savedBookmarks.push({ cfi: currentLocationCfi, name: currentChapterName });
         localStorage.setItem(BOOK_PREFIX + 'bookmarks', JSON.stringify(savedBookmarks));
         renderBookmarks();
-        alert(`🔖 Đã lưu đoạn đang đọc thuộc chương:\n${currentChapterName}`);
+        alert(`🔖 Đã lưu:\n${currentChapterName}`);
     } else {
         alert("Bạn đã lưu vị trí này rồi.");
     }
@@ -201,7 +297,7 @@ function exportData() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'Backup_EPUB.json';
+    a.download = 'Backup_Reader.json';
     a.click();
     URL.revokeObjectURL(url);
 }
@@ -223,7 +319,7 @@ function importData(event) {
             alert("✅ Phục hồi dữ liệu thành công!");
             loadSettings();
             renderBookmarks();
-            if(rendition && data.lastRead) rendition.display(data.lastRead);
+            if(data.lastRead) goTo(data.lastRead);
         } catch (err) {
             alert("❌ Lỗi: File dữ liệu không hợp lệ.");
         }
